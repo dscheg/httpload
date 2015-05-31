@@ -83,8 +83,8 @@ namespace httpload
 					Console.WriteLine("Examples:");
 					Console.WriteLine("  httpload http://example.com");
 					Console.WriteLine("  httpload -n100 -c8 --timeout=1000 http://example.com");
-					Console.WriteLine("  httpload -n100 -mHEAD -q\"params.txt\" http://example.com");
-					Console.WriteLine("  httpload -n100 -mPOST -i\"data.txt\" --100-continue http://example.com");
+					Console.WriteLine("  httpload -n100 -mHEAD -q\"params.txt\" \"http://example.com?p1={0}&p2={1}\"");
+					Console.WriteLine("  httpload -n100 -mPOST -i\"input.txt\" --100-continue http://example.com");
 					Console.WriteLine("  httpload -n100 -H\"Authorization:Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==\" -H\"Cookie:key=value\" http://example.com");
 					Console.WriteLine("  httpload -n100 --rps=0.5 --debug http://example.com");
 					Environment.Exit(0);
@@ -113,7 +113,7 @@ namespace httpload
 					: File
 						.ReadLines(qparams, Encoding.Default)
 						.Where(line => !string.IsNullOrEmpty(line))
-						.Select(line => new Uri(string.Format(urlFormat, line.Split('t').Select(HttpUtility.UrlEncode).ToArray())))
+						.Select(line => new Uri(string.Format(urlFormat, line.Split('\t').Select(HttpUtility.UrlEncode).ToArray())))
 						.ToArray();
 
 				if(urls.Length == 0)

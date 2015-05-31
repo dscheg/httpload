@@ -29,7 +29,7 @@ Options:
 Examples:
   httpload http://example.com
   httpload -n100 -c8 --timeout=1000 http://example.com
-  httpload -n100 -mHEAD -q"params.txt" http://example.com?p1={0}&amp;p2={1}
+  httpload -n100 -mHEAD -q"params.txt" "http://example.com?p1={0}&amp;p2={1}"
   httpload -n100 -mPOST -i"input.txt" --100-continue http://example.com
   httpload -n100 -H"Authorization:Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==" -H"Cookie:key=value" http://example.com
   httpload -n100 --rps=0.5 --debug http://example.com
