@@ -46,7 +46,9 @@ namespace httpload
 
 		private static async Task<HttpResult> DoRequestAsync(HttpWebRequest request, byte[] data)
 		{
-			if(data != null)
+			if(data == null)
+				request.ContentLength = 0L;
+			else
 			{
 				request.ContentLength = data.Length;
 				if(data.Length > 0)
@@ -93,7 +95,7 @@ namespace httpload
 			return request;
 		}
 
-		private const string UserAgent = "httpload/1.0";
+		private const string UserAgent = "httpload/1.1";
 	}
 
 	internal struct HttpResult

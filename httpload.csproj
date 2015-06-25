@@ -46,7 +46,6 @@
     <Compile Include="AsyncTaskRunner.cs" />
     <Compile Include="HttpStats.cs" />
     <Compile Include="ext\Options.cs" />
-    <Compile Include="utils\Jitter.cs" />
     <Compile Include="utils\NumbersHelper.cs" />
     <Compile Include="utils\EnumerableHelper.cs" />
     <Compile Include="Program.cs" />

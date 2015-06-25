@@ -130,7 +130,6 @@ namespace httpload
 				ServicePointManager.CheckCertificateRevocationList = false;
 				ServicePointManager.ServerCertificateValidationCallback = null;
 
-				Jitter.LoadAssembliesAndJitMethods();
 				Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
 				GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
 
