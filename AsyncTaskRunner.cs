@@ -9,35 +9,20 @@ namespace httpload
 	{
 		public static void Run<T>(IEnumerable<T> enumerable, Func<T, Task> job, int concurrency)
 		{
-			var need = 0;
-			var done = 0;
-			var threads = 0;
-			var lockObj = new object();
-			foreach(var item in enumerable)
+			using(var semaphore = new SemaphoreSlim(concurrency, concurrency))
 			{
-				var current = item;
-				lock(lockObj)
+				foreach(var item in enumerable)
 				{
-					need++;
-					while(threads >= concurrency)
-						Monitor.Wait(lockObj);
-					threads++;
-				}
-				Task.Factory.StartNew(async () =>
-				{
-					await job(current);
-					lock(lockObj)
+					semaphore.Wait();
+					var current = item;
+					Task.Run(async () =>
 					{
-						done++;
-						threads--;
-						Monitor.Pulse(lockObj);
-					}
-				}, TaskCreationOptions.PreferFairness);
-			}
-			lock(lockObj)
-			{
-				while(need > done)
-					Monitor.Wait(lockObj);
+						await job(current);
+						semaphore.Release();
+					});
+				}
+				for(int i = 0; i < concurrency; i++)
+					semaphore.Wait();
 			}
 		}
 	}

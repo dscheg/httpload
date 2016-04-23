@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
 
 namespace httpload.utils
 {
@@ -11,7 +12,7 @@ namespace httpload.utils
 
 		public static string ToPercentString(this double value)
 		{
-			return value.ToString("P", CultureInfo.InvariantCulture);
+			return (Math.Truncate(value * 10000.0) / 10000.0).ToString("P", CultureInfo.InvariantCulture);
 		}
 
 		public static string ToPercentString(this int value)

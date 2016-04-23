@@ -14,7 +14,7 @@ namespace httpload.utils
 		public static IEnumerable<T> TakeLoopback<T>(this ICollection<T> collection, int take, int skip = 0)
 		{
 			if(collection == null || collection.Count == 0)
-				throw new ArgumentException("Collection contains no elements", "collection");
+				throw new ArgumentException("Collection contains no elements", nameof(collection));
 			skip = skip % collection.Count;
 			while(take > 0)
 			{

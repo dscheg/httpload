@@ -24,28 +24,22 @@ namespace httpload
 			Interlocked.Add(ref TotalBytes, result.BytesReceived);
 			var index = Interlocked.Increment(ref TotalCount) - 1;
 
-			if(index % QuantileMod == 0 && index < QuantileSample.Length)
-				QuantileSample[index] = ticks;
+			if(index % QuantileMod == 0)
+				QuantileSample[index / QuantileMod % QuantileSample.Length] = ticks;
 
 			long min;
-			while((min = Interlocked.Read(ref MinTime)) > ticks)
-				Interlocked.CompareExchange(ref MinTime, ticks, min);
+			while((min = Interlocked.Read(ref MinTime)) > ticks && Interlocked.CompareExchange(ref MinTime, ticks, min) != min);
 
 			long max;
-			while((max = Interlocked.Read(ref MaxTime)) < ticks)
-				Interlocked.CompareExchange(ref MaxTime, ticks, max);
+			while((max = Interlocked.Read(ref MaxTime)) < ticks && Interlocked.CompareExchange(ref MaxTime, ticks, max) != max);
 
 			HttpCodes.AddOrUpdate(result.StatusCode, 1, (code, count) => count + 1);
 
-			for(int i = 0; i < Marks.Length; i++)
-			{
-				if(ticks < Marks[i])
-				{
-					Interlocked.Add(ref TotalTimes[i], ticks);
-					Interlocked.Increment(ref TotalCounts[i]);
-					break;
-				}
-			}
+			var idx = Array.BinarySearch(Marks, ticks);
+			if(idx < 0) idx = ~idx;
+
+			Interlocked.Add(ref TotalTimes[idx], ticks);
+			Interlocked.Increment(ref TotalCounts[idx]);
 
 			return index;
 		}
@@ -54,13 +48,16 @@ namespace httpload
 		{
 			TotalTime = TotalTimes.Sum();
 
-			var elapsed = (DateTime.UtcNow - Start);
+			var elapsed = DateTime.UtcNow - Start;
 			var avg = TotalTime / TotalCount;
+
+			Array.Sort(QuantileSample);
 
 			writer.WriteLine("Requests/sec:    {0}", (TotalCount / (elapsed.TotalSeconds + 0.000001)).ToStdString());
 			writer.WriteLine("Min time:        {0} ms", MinTime.TicksToMs());
 			writer.WriteLine("Max time:        {0} ms", MaxTime.TicksToMs());
 			writer.WriteLine("Avg time:        {0} ms", avg.TicksToMs());
+			writer.WriteLine("Median time:     {0} ms", QuantileSample[QuantileSample.Length >> 1].TicksToMs());
 			writer.WriteLine("Std deviation:   {0}", Math.Sqrt((double)QuantileSample.Sum(time => (time - avg) * (time - avg)) / QuantileSample.Length).TicksToMs().ToStdString(suffix: "ms"));
 			writer.WriteLine();
 			writer.WriteLine("Time taken:      {0}", elapsed.TotalSeconds.ToStdString(suffix: "sec"));
@@ -72,7 +69,6 @@ namespace httpload
 			HttpCodes.OrderBy(pair => pair.Key).ForEach(pair => writer.WriteLine("{0,10}\t{1,-10}\t{2}", pair.Value, pair.Key == 0 ? "Unknown error" : ((int)pair.Key).ToString(), ((double)pair.Value / TotalCount).ToPercentString()));
 			writer.WriteLine();
 
-			Array.Sort(QuantileSample);
 			writer.WriteLine("=== quantiles ===");
 			for(int i = 0; i < Quantiles.Length; i++)
 			{
@@ -86,10 +82,10 @@ namespace httpload
 			for(int i = 0; i < Marks.Length; i++)
 			{
 				sum += TotalCounts[i];
-				writer.WriteLine("{0,10}\t{1,-10}\t{2}", TotalCounts[i], string.Format("<{0} ms", Marks[i] == long.MaxValue ? "inf" : Marks[i].TicksToMs().ToString()), ((double)sum / TotalCount).ToPercentString());
+				writer.WriteLine("{0,10}\t{1,-10}\t{2}", TotalCounts[i], $"<{(Marks[i] == long.MaxValue ? "inf" : Marks[i].TicksToMs().ToString())} ms", ((double)sum / TotalCount).ToPercentString());
 			}
 			writer.WriteLine("----------");
-			writer.WriteLine("{0,10}\t{1,-10}\t{2}", TotalCount, string.Format("<{0} ms", MaxTime.TicksToMs()), 1.0.ToPercentString());
+			writer.WriteLine("{0,10}\t{1,-10}\t{2}", TotalCount, $"<{MaxTime.TicksToMs()} ms", 1.0.ToPercentString());
 		}
 
 		public static void Zero()
@@ -123,6 +119,8 @@ namespace httpload
 
 		private static readonly long[] Marks =
 		{
+			1L.MsToTicks(),
+			5L.MsToTicks(),
 			10L.MsToTicks(),
 			20L.MsToTicks(),
 			30L.MsToTicks(),

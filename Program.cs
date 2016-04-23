@@ -10,7 +10,6 @@ using System.Net.Http;
 using System.Runtime;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web;
 using httpload.utils;
 using NDesk.Options;
 
@@ -52,7 +51,7 @@ namespace httpload
 					{"w|warmup:", "Warm-up requests (default 0)", (int? v) => warmCount = v == null || v >= 0 ? v : warmCount},
 					{"rps=", "Requests per second limit (default +inf)", (double v) => rps = v > 0 ? v : rps},
 					{"timeout=", "Requests timeout (default 30000 msec)", (int v) => Timeout = v > 0 ? v : Timeout},
-					{"no-keep-alive", "Turn off keep alives", v => NoKeepAlive = v != null},
+					{"no-keep-alive", "Turn off keep alives", v => KeepAlive = v == null},
 					{"100-continue", "Enable 100-Continue behavior for POST/PUT", v => expect100Continue = v != null},
 					{"nagle", "Turn on Nagle algorithm", v => useNagle = v != null},
 					{"debug", "Show debug info about requests", v => Debug = v != null},
@@ -92,6 +91,7 @@ namespace httpload
 
 				TimeToSleep = double.IsPositiveInfinity(rps) ? 0 : (long)(concurrency * 1000.0 / rps);
 				if(warmCount == null) warmCount = Math.Min(Count, concurrency * 10);
+				if(warmCount > Count) warmCount = Count;
 
 				Console.WriteLine("URL format:      {0}", urlFormat);
 				Console.WriteLine("Requests count:  {0}", Count);
@@ -101,7 +101,7 @@ namespace httpload
 					Console.WriteLine("Input data file: {0}", input);
 				Console.WriteLine("Concurrency:     {0}", concurrency);
 				Console.WriteLine("RPS Limit:       {0}", rps.ToString(CultureInfo.InvariantCulture));
-				Console.WriteLine("KeepAlive:       {0}", !NoKeepAlive);
+				Console.WriteLine("KeepAlive:       {0}", KeepAlive);
 				Console.WriteLine("Use Nagle:       {0}", useNagle);
 				Console.WriteLine();
 
@@ -113,7 +113,7 @@ namespace httpload
 					: File
 						.ReadLines(qparams, Encoding.Default)
 						.Where(line => !string.IsNullOrEmpty(line))
-						.Select(line => new Uri(string.Format(urlFormat, line.Split('\t').Select(HttpUtility.UrlEncode).ToArray())))
+						.Select(line => new Uri(string.Format(urlFormat, line.Split('\t').Select(WebUtility.UrlEncode).ToArray())))
 						.ToArray();
 
 				if(urls.Length == 0)
@@ -123,17 +123,20 @@ namespace httpload
 				}
 
 				WebRequest.DefaultWebProxy = null;
-				ServicePointManager.EnableDnsRoundRobin = true;
+				if(!IsMonoRuntime())
+					ServicePointManager.EnableDnsRoundRobin = true;
 				ServicePointManager.DefaultConnectionLimit = int.MaxValue;
 				ServicePointManager.UseNagleAlgorithm = useNagle;
 				ServicePointManager.Expect100Continue = expect100Continue;
 				ServicePointManager.CheckCertificateRevocationList = false;
 				ServicePointManager.ServerCertificateValidationCallback = null;
+				ServicePointManager.MaxServicePoints = int.MaxValue;
+				ServicePointManager.MaxServicePointIdleTime = -1;
 
 				Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High;
 				GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
 
-				AsyncHttpClient.TestCreateRequest(urls[0], Method, Headers, !NoKeepAlive);
+				AsyncHttpClient.TestCreateRequest(urls[0], Method, Headers, KeepAlive);
 
 				HttpStats.Init(Count);
 
@@ -161,9 +164,8 @@ namespace httpload
 
 		private static async Task Run(Uri url)
 		{
-			var start = DateTime.UtcNow;
-			var result = await AsyncHttpClient.DoRequestAsync(url, Method, Headers, Data, Timeout, !NoKeepAlive);
-			if(Debug) Console.WriteLine("{0}\t{1,10}\t{2,-10}\t{3}", start.ToLocalTime().ToString("HH:mm:ss.fff"), (int)result.StatusCode, (result.ElapsedTicks.TicksToMs()) + " ms", url);
+			var result = await AsyncHttpClient.DoRequestAsync(url, Method, Headers, Data, Timeout, KeepAlive);
+			if(Debug) Console.WriteLine("{0}\t{1,10}\t{2,-10}\t{3}", DateTime.Now.ToString("HH:mm:ss.fff"), (int)result.StatusCode, result.ElapsedTicks.TicksToMs() + " ms", url);
 			var count = HttpStats.Update(result) + 1;
 			if(LogCount > 0 && count % LogCount == 0)
 				Console.Error.WriteLine("Completed {0}", count);
@@ -174,10 +176,15 @@ namespace httpload
 			}
 		}
 
+		private static bool IsMonoRuntime()
+		{
+			return Type.GetType("Mono.Runtime") != null;
+		}
+
 		private static int Count = 1;
 		private static int LogCount;
 		private static bool Debug;
-		private static bool NoKeepAlive;
+		private static bool KeepAlive = true;
 		private static long TimeToSleep;
 		private static HttpMethod Method;
 		private static NameValueCollection Headers;

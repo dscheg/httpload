@@ -24,14 +24,10 @@ namespace httpload
 				var request = CreateWebRequest(uri, method, headers, keepAlive);
 
 				stopwatch.Start();
-				var task = DoRequestAsync(request, data);
-				if(ReferenceEquals(task, await Task.WhenAny(task, Task.Delay(timeout))))
-					result = task.Result;
-				else
-				{
+
+				result = await DoRequestAsync(request, data).WithTimeout(timeout, HttpResult.Timeout);
+				if(HttpResult.Timeout.Equals(result))
 					try { request.Abort(); } catch { }
-					result = HttpResult.Timeout;
-				}
 			}
 			catch
 			{
@@ -95,7 +91,7 @@ namespace httpload
 			return request;
 		}
 
-		private const string UserAgent = "httpload/1.1";
+		private const string UserAgent = "httpload/1.2";
 	}
 
 	internal struct HttpResult
